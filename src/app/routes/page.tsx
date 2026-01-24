@@ -18,7 +18,7 @@ type SearchForm = {
   q?: string;
 };
 
-export async function getStopsForRoute(routeId: number) {
+async function getStopsForRoute(routeId: number) {
   const { data, error } = await supabase
     .from("stops")
     .select("latitude, longitude, location")
@@ -34,73 +34,73 @@ export async function getStopsForRoute(routeId: number) {
 }
 
 export default function RoutesList() {
-    const go = useGo();
-    const [modalVisible, setModalVisible] = useState(false);
-    const [editingId, setEditingId] = useState<number | null>(null);
+  const go = useGo();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-    const [stopsModalOpen, setStopsModalOpen] = useState(false);
-    const [selectedRouteId, setSelectedRouteId] = useState<number>();
+  const [stopsModalOpen, setStopsModalOpen] = useState(false);
+  const [selectedRouteId, setSelectedRouteId] = useState<number>();
 
-    const [data, setData] = useState<any[]>([]);
-    const [filtered, setFiltered] = useState<any[]>([]);
+  const [data, setData] = useState<any[]>([]);
+  const [filtered, setFiltered] = useState<any[]>([]);
 
-    const [mapModalOpen, setMapModalOpen] = useState(false);
-    const [mapStops, setMapStops] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [mapStops, setMapStops] = useState<{ latitude: number; longitude: number }[]>([]);
 
-    const [mapModalStartLocation, setMapModalStartLocation] = useState<{ latitude: number; longitude: number; name?: string } | null>(null);
-    const [mapModalEndLocation, setMapModalEndLocation] = useState<{ latitude: number; longitude: number; name?: string } | null>(null);
+  const [mapModalStartLocation, setMapModalStartLocation] = useState<{ latitude: number; longitude: number; name?: string } | null>(null);
+  const [mapModalEndLocation, setMapModalEndLocation] = useState<{ latitude: number; longitude: number; name?: string } | null>(null);
 
-    const { tableProps, searchFormProps, tableQuery } = useTable({
-        syncWithLocation: false,
+  const { tableProps, searchFormProps, tableQuery } = useTable({
+    syncWithLocation: false,
 
-        onSearch: (values : SearchForm) => {
-            const search = values.q;
+    onSearch: (values: SearchForm) => {
+      const search = values.q;
 
-            if (!search) return [];
+      if (!search) return [];
 
-            return [
-            {
-                field: "start_location",
-                operator: "contains",
-                value: search,
-            },
-            {
-                field: "end_location",
-                operator: "contains",
-                value: search,
-            },
-            ];
+      return [
+        {
+          field: "start_location",
+          operator: "contains",
+          value: search,
         },
-    });
-
-    
-    useEffect(() => {
-        if (tableQuery.data?.data) {
-            setData(tableQuery.data.data);
-            setFiltered(tableQuery.data.data);
-        }
-    }, [tableQuery.data]);
-
-    const handleSearch = (value: string) => {
-        const txt = value.toLowerCase();
-
-        const result = data.filter((item) =>
-            item.start_location.toLowerCase().includes(txt) ||
-            item.end_location.toLowerCase().includes(txt)
-        );
-
-        setFiltered(result);
-    };
+        {
+          field: "end_location",
+          operator: "contains",
+          value: search,
+        },
+      ];
+    },
+  });
 
 
-return (
+  useEffect(() => {
+    if (tableQuery.data?.data) {
+      setData(tableQuery.data.data);
+      setFiltered(tableQuery.data.data);
+    }
+  }, [tableQuery.data]);
+
+  const handleSearch = (value: string) => {
+    const txt = value.toLowerCase();
+
+    const result = data.filter((item) =>
+      item.start_location.toLowerCase().includes(txt) ||
+      item.end_location.toLowerCase().includes(txt)
+    );
+
+    setFiltered(result);
+  };
+
+
+  return (
     <List title="Routes" headerButtons={() => null}>
       {/* BUSCADOR */}
       <form {...searchFormProps}>
         <Input
-            placeholder="Buscar por ubicación inicial o final"
-            style={{ marginBottom: 20, maxWidth: 300 }}
-            onChange={(e) => handleSearch(e.target.value)}
+          placeholder="Buscar por ubicación inicial o final"
+          style={{ marginBottom: 20, maxWidth: 300 }}
+          onChange={(e) => handleSearch(e.target.value)}
         />
       </form>
 
@@ -128,47 +128,47 @@ return (
           title="Acciones"
           render={(record: any) => (
             <Space>
-                <Button
-                    icon={<EditOutlined />}
-                    onClick={() => {
-                    setEditingId(record.id);
-                    setModalVisible(true);
-                    }}
-                />
-                <Button
-                    icon={<EnvironmentOutlined />}
-                    onClick={() => {
-                        setSelectedRouteId(record.id);
-                        setStopsModalOpen(true);
-                    }}
-                    >
-                    Manage Stops
-                </Button>
+              <Button
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setEditingId(record.id);
+                  setModalVisible(true);
+                }}
+              />
+              <Button
+                icon={<EnvironmentOutlined />}
+                onClick={() => {
+                  setSelectedRouteId(record.id);
+                  setStopsModalOpen(true);
+                }}
+              >
+                Manage Stops
+              </Button>
 
-                <Button
-                    onClick={async () => {
-                        if (!record.id) return;
+              <Button
+                onClick={async () => {
+                  if (!record.id) return;
 
-                        setSelectedRouteId(record.id);
+                  setSelectedRouteId(record.id);
 
-                        const stops = await getStopsForRoute(record.id);
-                        setMapStops(stops);
+                  const stops = await getStopsForRoute(record.id);
+                  setMapStops(stops);
 
-                        setMapModalOpen(true);
-                        setMapModalStartLocation({
-                            latitude: record.start_latitude,
-                            longitude: record.start_longitude,
-                            name: record.start_location,
-                        });
-                        setMapModalEndLocation({
-                            latitude: record.end_latitude,
-                            longitude: record.end_longitude,
-                            name: record.end_location,
-                        });
-                    }}
-                >
-                    View Route
-                </Button>
+                  setMapModalOpen(true);
+                  setMapModalStartLocation({
+                    latitude: record.start_latitude,
+                    longitude: record.start_longitude,
+                    name: record.start_location,
+                  });
+                  setMapModalEndLocation({
+                    latitude: record.end_latitude,
+                    longitude: record.end_longitude,
+                    name: record.end_location,
+                  });
+                }}
+              >
+                View Route
+              </Button>
             </Space>
           )}
         />
@@ -187,24 +187,24 @@ return (
         />
       </Modal>
 
-        <Modal
-            open={stopsModalOpen}
-            onCancel={() => setStopsModalOpen(false)}
-            footer={null}
-            width={800}
-            destroyOnClose
-            >
-            <StopsManager routeId={selectedRouteId} />
-        </Modal>
+      <Modal
+        open={stopsModalOpen}
+        onCancel={() => setStopsModalOpen(false)}
+        footer={null}
+        width={800}
+        destroyOnClose
+      >
+        <StopsManager routeId={selectedRouteId} />
+      </Modal>
 
-        <Modal
-            open={mapModalOpen}
-            onCancel={() => setMapModalOpen(false)}
-            footer={null}
-            width={800}
-        >
-            <RouteMapModal startLocation={mapModalStartLocation!} endLocation={mapModalEndLocation!} routeId={selectedRouteId} stops={mapStops} onClose={() => setMapModalOpen(false)} />
-        </Modal>
+      <Modal
+        open={mapModalOpen}
+        onCancel={() => setMapModalOpen(false)}
+        footer={null}
+        width={800}
+      >
+        <RouteMapModal startLocation={mapModalStartLocation!} endLocation={mapModalEndLocation!} routeId={selectedRouteId} stops={mapStops} onClose={() => setMapModalOpen(false)} />
+      </Modal>
 
     </List>
   );
