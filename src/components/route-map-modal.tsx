@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
+import { supabaseBrowserClient } from "@utils/supabase/client";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
@@ -25,6 +26,7 @@ export function RouteMapModal({
   endLocation,
   stops,
   onClose,
+  routeId,
 }: RouteMapModalProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -37,6 +39,7 @@ export function RouteMapModal({
         style: "mapbox://styles/mapbox/streets-v11",
         center: [startLocation.longitude, startLocation.latitude],
         zoom: 12,
+        preserveDrawingBuffer: true,
       });
 
       map.current.on("load", () => {
@@ -108,17 +111,17 @@ export function RouteMapModal({
           i === 0
             ? "green"
             : i === allPoints.length - 1
-            ? "red"
-            : "orange";
+              ? "red"
+              : "orange";
         el.style.border = "2px solid white";
 
         const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
             <div style="color: black;">
                 ${point.name
-                ? point.name
-                : i === 0
-                ? "Inicio"
-                : i === allPoints.length - 1
+            ? point.name
+            : i === 0
+              ? "Inicio"
+              : i === allPoints.length - 1
                 ? "Fin"
                 : `Parada ${i}`}
             </div>
@@ -141,5 +144,75 @@ export function RouteMapModal({
     }
   }
 
-  return <div style={{ width: "100%", height: "400px" }} ref={mapContainer} />;
+  const handleSaveThumbnail = async () => {
+    if (!map.current || !routeId) return;
+
+    try {
+      const canvas = map.current.getCanvas();
+      const dataURL = canvas.toDataURL("image/png");
+      const blob = await (await fetch(dataURL)).blob();
+
+      const fileName = `routes/${routeId}_${Date.now()}.png`;
+      const supabase = supabaseBrowserClient;
+
+      // 1. Upload image
+      const { data: uploadData, error: uploadError } = await supabase
+        .storage
+        .from("route_images")
+        .upload(fileName, blob, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 2. Get Public URL
+      const { data: publicUrlData } = supabase
+        .storage
+        .from("route_images")
+        .getPublicUrl(fileName);
+
+      const publicUrl = publicUrlData.publicUrl;
+
+      // 3. Update route record
+      const { error: updateError } = await supabase
+        .from("routes")
+        .update({ image_url: publicUrl })
+        .eq("id", routeId);
+
+      if (updateError) throw updateError;
+
+      // Usar Antd Message estático si es posible, o alert por ahora si no está en props
+      // Pero mejor importar message de antd
+      // message.success("Miniatura guardada correctamente"); 
+      // (NOTA: message hook es mejor, pero aquí usaré window.alert o console para no romper hooks si no hay App context, 
+      //  pero antd suele tener static methods. Usaré console y callback si existiera, o un simple alert)
+      alert("Miniatura guardada correctamente");
+
+    } catch (error) {
+      console.error("Error saving thumbnail:", error);
+      alert("Error al guardar la miniatura");
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ width: "100%", height: "400px", marginBottom: 16 }} ref={mapContainer} />
+      {routeId && (
+        <button
+          onClick={handleSaveThumbnail}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#1890ff",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer"
+          }}
+        >
+          Guardar como Miniatura
+        </button>
+      )}
+    </div>
+  );
 }
