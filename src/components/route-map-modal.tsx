@@ -7,16 +7,15 @@ import { supabaseBrowserClient } from "@utils/supabase/client";
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
 interface Stop {
-  latitude: number;
-  longitude: number;
+  coords: { latitude: number; longitude: number };
   name?: string;
   stop_order?: number;
 }
 
 interface RouteMapModalProps {
   routeId?: number;
-  startLocation: { latitude: number; longitude: number; name?: string };
-  endLocation: { latitude: number; longitude: number; name?: string };
+  startLocation: { coords: { latitude: number; longitude: number }; name?: string };
+  endLocation: { coords: { latitude: number; longitude: number }; name?: string };
   stops: Stop[];
   onClose: () => void;
 }
@@ -37,7 +36,7 @@ export function RouteMapModal({
       map.current = new mapboxgl.Map({
         container: mapContainer.current!,
         style: "mapbox://styles/mapbox/streets-v11",
-        center: [startLocation.longitude, startLocation.latitude],
+        center: [startLocation.coords.longitude, startLocation.coords.latitude],
         zoom: 12,
         preserveDrawingBuffer: true,
       });
@@ -64,7 +63,7 @@ export function RouteMapModal({
 
     // Construir coordenadas incluyendo inicio y fin
     const allPoints = [startLocation, ...orderedStops, endLocation];
-    const coordinates = allPoints.map((s) => `${s.longitude},${s.latitude}`).join(";");
+    const coordinates = allPoints.map((s) => `${s.coords.longitude},${s.coords.latitude}`).join(";");
 
     try {
       const res = await fetch(
@@ -128,7 +127,7 @@ export function RouteMapModal({
         `);
 
         const marker = new mapboxgl.Marker({ element: el })
-          .setLngLat([point.longitude, point.latitude])
+          .setLngLat([point.coords.longitude, point.coords.latitude])
           .setPopup(popup)
           .addTo(map.current!);
 
@@ -137,7 +136,7 @@ export function RouteMapModal({
 
       // Ajustar bounds para que se vean todos los puntos
       const bounds = new mapboxgl.LngLatBounds();
-      allPoints.forEach((s) => bounds.extend([s.longitude, s.latitude]));
+      allPoints.forEach((s) => bounds.extend([s.coords.longitude, s.coords.latitude]));
       map.current.fitBounds(bounds, { padding: 50 });
     } catch (error) {
       console.error("Error fetching route from Mapbox Directions API", error);

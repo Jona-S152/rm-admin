@@ -2,14 +2,31 @@
 
 import { useTable, List } from "@refinedev/antd";
 import { Button, Modal, Space, Table, Input } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { EditOutlined, EnvironmentOutlined, PlusOutlined } from "@ant-design/icons";
-import { useGo } from "@refinedev/core";
 
 import { RouteForm } from "./route-form";
 import { StopsManager } from "@components/stops-manager";
 import { RouteMapModal } from "@components/route-map-modal";
 import { supabaseBrowserClient } from "@utils/supabase/client";
+
+// Parse a PostGIS geometry value returned by Supabase.
+// Supabase can return it as a GeoJSON object { type: "Point", coordinates: [lng, lat] }
+// or as a WKT string "POINT(lng lat)".
+function parseCoords(value: any): { latitude: number; longitude: number } {
+  if (!value) return { latitude: 0, longitude: 0 };
+
+  if (value?.type === "Point" && Array.isArray(value.coordinates)) {
+    return { longitude: value.coordinates[0], latitude: value.coordinates[1] };
+  }
+
+  if (typeof value === "string") {
+    const match = value.match(/POINT\s*\(\s*([\d.-]+)\s+([\d.-]+)\s*\)/i);
+    if (match) return { longitude: parseFloat(match[1]), latitude: parseFloat(match[2]) };
+  }
+
+  return { latitude: 0, longitude: 0 };
+}
 
 // ❗CORRECTO para componentes cliente
 const supabase = supabaseBrowserClient;
@@ -21,7 +38,7 @@ type SearchForm = {
 async function getStopsForRoute(routeId: number) {
   const { data, error } = await supabase
     .from("stops")
-    .select("latitude, longitude, location")
+    .select("coords::json, location, stop_order")
     .eq("route_id", routeId)
     .order("stop_order", { ascending: true });
 
@@ -34,7 +51,6 @@ async function getStopsForRoute(routeId: number) {
 }
 
 export default function RoutesList() {
-  const go = useGo();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -45,13 +61,15 @@ export default function RoutesList() {
   const [filtered, setFiltered] = useState<any[]>([]);
 
   const [mapModalOpen, setMapModalOpen] = useState(false);
-  const [mapStops, setMapStops] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [mapStops, setMapStops] = useState<{ coords: { latitude: number; longitude: number } }[]>([]);
 
-  const [mapModalStartLocation, setMapModalStartLocation] = useState<{ latitude: number; longitude: number; name?: string } | null>(null);
-  const [mapModalEndLocation, setMapModalEndLocation] = useState<{ latitude: number; longitude: number; name?: string } | null>(null);
+  const [mapModalStartLocation, setMapModalStartLocation] = useState<{ coords: { latitude: number; longitude: number }; name?: string } | null>(null);
+  const [mapModalEndLocation, setMapModalEndLocation] = useState<{ coords: { latitude: number; longitude: number }; name?: string } | null>(null);
 
   const { tableProps, searchFormProps, tableQuery } = useTable({
     syncWithLocation: false,
+    // Cast geometry columns to JSON so parseCoords can read them as GeoJSON
+    meta: { select: "*, start_coords::json, end_coords::json" },
 
     onSearch: (values: SearchForm) => {
       const search = values.q;
@@ -151,18 +169,21 @@ export default function RoutesList() {
 
                   setSelectedRouteId(record.id);
 
-                  const stops = await getStopsForRoute(record.id);
+                  const rawStops = await getStopsForRoute(record.id);
+                  // Normalize coords from PostGIS geometry to { latitude, longitude }
+                  const stops = rawStops.map((s: any) => ({
+                    ...s,
+                    coords: parseCoords(s.coords),
+                  }));
                   setMapStops(stops);
 
                   setMapModalOpen(true);
                   setMapModalStartLocation({
-                    latitude: record.start_latitude,
-                    longitude: record.start_longitude,
+                    coords: parseCoords(record.start_coords),
                     name: record.start_location,
                   });
                   setMapModalEndLocation({
-                    latitude: record.end_latitude,
-                    longitude: record.end_longitude,
+                    coords: parseCoords(record.end_coords),
                     name: record.end_location,
                   });
                 }}
